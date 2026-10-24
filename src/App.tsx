@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount }
 import {
   ArrowRight, Check, CheckCheck, CheckCircle2, ChevronDown,
   CircleHelp, CloudOff, Ellipsis, Leaf, ListChecks,
-  Pencil, Plus, Search, ShoppingBasket, Sparkles, Trash2, X,
+  Pencil, Plus, RotateCcw, Search, ShoppingBasket, Sparkles, Trash2, X,
 } from 'lucide-solid';
 import Modal from './components/Modal';
 import { ListIcon } from './components/ListIcon';
@@ -41,8 +41,10 @@ export default function App(props: AppProps) {
   const [toastAction, setToastAction] = createSignal<{ label: string; onClick: () => void } | null>(null);
   const [inputFocused, setInputFocused] = createSignal(false);
   const [showAllIcons, setShowAllIcons] = createSignal(false);
+  const [stickyProgressVisible, setStickyProgressVisible] = createSignal(false);
   let itemInput!: HTMLInputElement;
   let menuElement!: HTMLDivElement;
+  let progressCard!: HTMLElement;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   const activeList = createMemo(() => state().lists.find(list => list.id === state().activeListId) ?? state().lists[0]);
@@ -61,6 +63,13 @@ export default function App(props: AppProps) {
   });
 
   onMount(() => {
+    const updateStickyProgress = () => {
+      const progressBounds = progressCard.getBoundingClientRect();
+      const isVisible = stickyProgressVisible();
+      const shouldShow = isVisible ? progressBounds.top < 32 : progressBounds.bottom < 0;
+      if (shouldShow !== isVisible) setStickyProgressVisible(shouldShow);
+    };
+
     const handlePointer = (event: PointerEvent) => {
       if (menuOpen() && menuElement && !menuElement.contains(event.target as Node)) setMenuOpen(false);
     };
@@ -70,9 +79,14 @@ export default function App(props: AppProps) {
         if (editingItemId()) setEditingItemId(null);
       }
     };
+    window.addEventListener('scroll', updateStickyProgress, { passive: true });
+    window.addEventListener('resize', updateStickyProgress);
+    updateStickyProgress();
     window.addEventListener('pointerdown', handlePointer);
     window.addEventListener('keydown', handleKey);
     onCleanup(() => {
+      window.removeEventListener('scroll', updateStickyProgress);
+      window.removeEventListener('resize', updateStickyProgress);
       window.removeEventListener('pointerdown', handlePointer);
       window.removeEventListener('keydown', handleKey);
       if (toastTimer) clearTimeout(toastTimer);
@@ -128,6 +142,23 @@ export default function App(props: AppProps) {
           checked: !item.checked,
           ...(item.checked ? { checkedAt: undefined } : { checkedAt: new Date().toISOString() }),
         } : item),
+      } : list),
+    }));
+  }
+
+  function setActiveListItemsChecked(checked: boolean) {
+    const targetId = activeList()?.id;
+    if (!targetId) return;
+    const checkedAt = new Date().toISOString();
+    setState(previous => ({
+      ...previous,
+      lists: previous.lists.map(list => list.id === targetId ? {
+        ...list,
+        items: list.items.map(item => item.checked === checked ? item : {
+          ...item,
+          checked,
+          checkedAt: checked ? checkedAt : undefined,
+        }),
       } : list),
     }));
   }
@@ -278,6 +309,15 @@ export default function App(props: AppProps) {
       <LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/>
     </main>
   }><div class="min-h-dvh bg-[#f8faf7] text-[#243a2e]">
+    <div aria-hidden={!stickyProgressVisible()} class={`fixed inset-x-0 top-0 z-50 transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none lg:left-[17.125rem] xl:left-[18.75rem] ${stickyProgressVisible() ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+        <div class="mx-auto w-full max-w-260 px-5 sm:px-9 lg:px-11 xl:px-16">
+          <div class="rounded-b-[18px] bg-[#205845] px-4 pb-3.5 pt-3 shadow-[0_8px_22px_rgba(32,88,69,.1)] sm:px-5 sm:pb-4">
+            <div class="h-2 overflow-hidden rounded-full bg-white/17" role="progressbar" aria-label={t('progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={completePercent()}>
+              <div class="h-full rounded-full bg-[#cce69b] transition-[width] duration-300" style={{ width: `${completePercent()}%` }}/>
+            </div>
+          </div>
+        </div>
+    </div>
     <div class="mx-auto flex min-h-dvh max-w-384">
       {/* Desktop navigation */}
       <aside class="hidden w-68.5 shrink-0 flex-col border-r border-[#e8eee7] bg-[#fcfdfa] px-5 pb-7 pt-8 lg:flex xl:w-75 xl:px-6">
@@ -359,7 +399,7 @@ export default function App(props: AppProps) {
           </div>
 
           {/* Progress card */}
-          <section class="relative mb-5 overflow-hidden rounded-[18px] bg-[#205845] px-4 py-3.5 text-white shadow-[0_5px_16px_rgba(32,88,69,.1)] sm:mb-6 sm:px-5 sm:py-4" aria-label={t('progress')}>
+          <section ref={progressCard} class="relative mb-5 overflow-hidden rounded-[18px] bg-[#205845] px-4 py-3.5 text-white shadow-[0_5px_16px_rgba(32,88,69,.1)] sm:mb-6 sm:px-5 sm:py-4" aria-label={t('progress')}>
             <div class="relative flex items-center justify-between gap-4">
               <div>
                 <p class="text-[10px] font-bold tracking-[.06em] text-[#bfdbbc]">{t('shoppingProgress')}</p>
@@ -455,14 +495,32 @@ export default function App(props: AppProps) {
               </div>
             }>
               <div>
-                <div class="mb-3 flex items-center gap-2.5"><span class="h-2 w-2 rounded-full bg-[#3c9566]"/><h3 class="text-[11px] font-extrabold tracking-[.11em] text-[#657c6b]">{t('toPickUp')}</h3><span class="rounded-full bg-[#e6f0e5] px-2 py-0.5 text-[10px] font-bold text-[#4f775b]">{pendingItems().length}</span><span class="h-px flex-1 bg-[#e5ece4]"/></div>
+                <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span class="h-2 w-2 rounded-full bg-[#3c9566]"/>
+                  <h3 class="text-[11px] font-extrabold tracking-[.11em] text-[#657c6b]">{t('toPickUp')}</h3>
+                  <span class="rounded-full bg-[#e6f0e5] px-2 py-0.5 text-[10px] font-bold text-[#4f775b]">{pendingItems().length}</span>
+                  <Show when={pendingItems().length > 0}>
+                    <button type="button" class="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[11px] font-bold text-[#337654] transition-colors hover:bg-[#edf5e9] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]" onClick={() => setActiveListItemsChecked(true)}>
+                      <CheckCheck size={15}/>{t('checkAll')}
+                    </button>
+                  </Show>
+                  <span aria-hidden="true" class="h-px min-w-3 flex-1 bg-[#e5ece4]"/>
+                </div>
                 <Show when={pendingItems().length} fallback={<div class="mb-6 rounded-[15px] bg-[#edf5e9] p-5 text-center text-[12px] font-semibold text-[#4d845b]"><CheckCheck size={20} class="mr-1 inline-block align-middle"/> {t('everythingChecked')}</div>}>
                   <ul class="space-y-2"><For each={pendingItems()}>{item => <ItemRow item={item}/>}</For></ul>
                 </Show>
               </div>
               <Show when={completedItems().length}>
                 <div class="mt-7">
-                  <div class="mb-3 flex items-center gap-2.5"><CheckCircle2 size={14} class="text-[#7caf8b]"/><h3 class="text-[11px] font-extrabold tracking-[.11em] text-[#91a397]">{t('inBasket')}</h3><span class="rounded-full bg-[#eff2ed] px-2 py-0.5 text-[10px] font-bold text-[#89998c]">{completedItems().length}</span><span class="h-px flex-1 bg-[#e5ece4]"/></div>
+                  <div class="mb-3 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <CheckCircle2 size={14} class="text-[#7caf8b]"/>
+                    <h3 class="text-[11px] font-extrabold tracking-[.11em] text-[#91a397]">{t('inBasket')}</h3>
+                    <span class="rounded-full bg-[#eff2ed] px-2 py-0.5 text-[10px] font-bold text-[#89998c]">{completedItems().length}</span>
+                    <button type="button" class="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg px-2 text-[11px] font-bold text-[#718879] transition-colors hover:bg-[#eff2ed] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]" onClick={() => setActiveListItemsChecked(false)}>
+                      <RotateCcw size={14}/>{t('uncheckAll')}
+                    </button>
+                    <span aria-hidden="true" class="h-px min-w-3 flex-1 bg-[#e5ece4]"/>
+                  </div>
                   <ul class="space-y-2"><For each={completedItems()}>{item => <ItemRow item={item}/>}</For></ul>
                 </div>
               </Show>
