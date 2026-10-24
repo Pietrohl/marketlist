@@ -1,11 +1,25 @@
-const CACHE_NAME = 'gather-shell-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/favicon.svg', '/locales/en.json', '/locales/pt-BR.json'];
+const CACHE_NAME = 'gather-shell-v2';
+const APP_BASE = new URL(self.registration.scope);
+const APP_PATH = APP_BASE.pathname;
+const INDEX_URL = new URL('index.html', APP_BASE);
+const APP_SHELL = [
+  '',
+  'index.html',
+  'manifest.webmanifest',
+  'icon.svg',
+  'favicon.svg',
+  'locales/en.json',
+  'locales/pt-BR.json',
+].map(path => new URL(path, APP_BASE).href);
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
-    const index = await fetch('/index.html');
-    const html = await index.text();
-    const buildAssets = [...html.matchAll(/(?:src|href)=["'](\/assets\/[^"']+)["']/g)].map(match => match[1]);
+    const response = await fetch(INDEX_URL);
+    const html = await response.text();
+    const buildAssets = [...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
+      .map(match => new URL(match[1], APP_BASE))
+      .filter(url => url.origin === APP_BASE.origin && url.pathname.startsWith(`${APP_PATH}assets/`))
+      .map(url => url.href);
     const cache = await caches.open(CACHE_NAME);
     await cache.addAll([...new Set([...APP_SHELL, ...buildAssets])]);
     await self.skipWaiting();
@@ -21,18 +35,18 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (request.method !== 'GET' || url.origin !== APP_BASE.origin || !url.pathname.startsWith(APP_PATH)) return;
 
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).then(response => {
-      if (response.ok) void caches.open(CACHE_NAME).then(cache => cache.put('/index.html', response.clone()));
+      if (response.ok) void caches.open(CACHE_NAME).then(cache => cache.put(INDEX_URL, response.clone()));
       return response;
-    }).catch(async () => (await caches.match('/index.html')) || (await caches.match('/'))));
+    }).catch(async () => (await caches.match(INDEX_URL)) || (await caches.match(APP_BASE.href))));
     return;
   }
 
   event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
-    if (response.ok && (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/locales/'))) {
+    if (response.ok && (url.pathname.startsWith(`${APP_PATH}assets/`) || url.pathname.startsWith(`${APP_PATH}locales/`))) {
       void caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
     }
     return response;

@@ -11,7 +11,7 @@ export function getPreferredLocale(): Locale {
 }
 
 export async function loadMessages(locale: Locale): Promise<Messages> {
-  const response = await fetch(`/locales/${locale}.json`, { cache: 'no-cache' });
+  const response = await fetch(`${import.meta.env.BASE_URL}locales/${locale}.json`, { cache: 'no-cache' });
   if (!response.ok) throw new Error(`Translation asset failed: ${response.status}`);
   const messages: unknown = await response.json();
   if (!messages || typeof messages !== 'object' || Array.isArray(messages)) throw new Error('Invalid translation asset');

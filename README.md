@@ -23,9 +23,13 @@ Startup loads and validates the selected translation JSON before mounting the UI
 
 The production build includes a web app manifest and a service worker. Serve the app over HTTPS (localhost is also supported) to enable installation and offline use. The first visit needs a network connection to download the app and language files. After service worker installation, the app shell and both translation files are available offline. List data stays in localStorage and is never sent to a server.
 
-## Static serverless deployment
+## GitHub Pages deployment
 
-The build output is host-neutral and can be served by a static serverless host or object storage/CDN. A Lambda is not needed to deliver the app. Deploy the contents of `dist/` at the site's root and configure the host to:
+The `main` branch deploys automatically to GitHub Pages after each push. The workflow builds the app and publishes `dist/`; it can also be started manually from the Actions tab. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. The Vite base path is `/marketlist/` to match this repository's project site URL.
+
+## Other static hosting
+
+The app can also be hosted on a static server or object storage/CDN. For a different host, set `base` in `vite.config.ts` to the URL path where the app will live before building (use `/` for a domain root). A Lambda is not needed to deliver the app. Deploy the contents of `dist/` at that path and configure the host to:
 
 - Serve `/` and unknown navigation paths with `index.html` (SPA fallback).
 - Return JavaScript, JSON, SVG, and webmanifest assets with their correct content types.
