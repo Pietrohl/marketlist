@@ -44,7 +44,7 @@ export default function App(props: AppProps) {
   const [stickyProgressVisible, setStickyProgressVisible] = createSignal(false);
   let itemInput!: HTMLInputElement;
   let menuElement!: HTMLDivElement;
-  let progressCard!: HTMLElement;
+  let progressBar!: HTMLDivElement;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   const activeList = createMemo(() => state().lists.find(list => list.id === state().activeListId) ?? state().lists[0]);
@@ -91,7 +91,7 @@ export default function App(props: AppProps) {
       }, 250);
     };
     const updateStickyProgress = () => {
-      const progressBounds = progressCard.getBoundingClientRect();
+      const progressBounds = progressBar.getBoundingClientRect();
       const isVisible = stickyProgressVisible();
       const shouldShow = isVisible ? progressBounds.top < 32 : progressBounds.bottom < 0;
       if (shouldShow !== isVisible) setStickyProgressVisible(shouldShow);
@@ -436,7 +436,7 @@ export default function App(props: AppProps) {
           </div>
 
           {/* Progress card */}
-          <section ref={progressCard} class="relative mb-5 overflow-hidden rounded-[18px] bg-[#205845] px-4 py-3.5 text-white shadow-[0_5px_16px_rgba(32,88,69,.1)] sm:mb-6 sm:px-5 sm:py-4" aria-label={t('progress')}>
+          <section class="relative mb-5 overflow-hidden rounded-[18px] bg-[#205845] px-4 py-3.5 text-white shadow-[0_5px_16px_rgba(32,88,69,.1)] sm:mb-6 sm:px-5 sm:py-4" aria-label={t('progress')}>
             <div class="relative flex items-center justify-between gap-4">
               <div>
                 <p class="text-[10px] font-bold tracking-[.06em] text-[#bfdbbc]">{t('shoppingProgress')}</p>
@@ -447,7 +447,7 @@ export default function App(props: AppProps) {
               </div>
               <span class="shrink-0 text-[17px] font-extrabold tabular-nums text-[#e4f7c9]">{completePercent()}%</span>
             </div>
-            <div class="relative mt-3 h-2 overflow-hidden rounded-full bg-white/17" role="progressbar" aria-label={t('progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={completePercent()}>
+            <div  ref={progressBar}  class="relative mt-3 h-2 overflow-hidden rounded-full bg-white/17" role="progressbar" aria-label={t('progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={completePercent()}>
               <div class="h-full rounded-full bg-[#cce69b] transition-[width] duration-300" style={{ width: `${completePercent()}%` }}/>
             </div>
           </section>
