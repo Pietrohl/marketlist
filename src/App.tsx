@@ -63,6 +63,33 @@ export default function App(props: AppProps) {
   });
 
   onMount(() => {
+    const visualViewport = window.visualViewport;
+    let focusScrollTimer: ReturnType<typeof setTimeout> | undefined;
+    const syncKeyboardViewport = () => {
+      const viewportHeight = visualViewport?.height ?? window.innerHeight;
+      const keyboardInset = Math.max(0, window.innerHeight - viewportHeight - (visualViewport?.offsetTop ?? 0));
+      document.documentElement.style.setProperty('--app-viewport-height', `${viewportHeight}px`);
+      document.documentElement.style.setProperty('--keyboard-inset', `${keyboardInset}px`);
+
+      if (keyboardInset > 100) {
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && focused.matches('input, textarea, select')) {
+          const bounds = focused.getBoundingClientRect();
+          const visibleBottom = (visualViewport?.offsetTop ?? 0) + viewportHeight;
+          if (bounds.bottom > visibleBottom - 16) focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    };
+    const scheduleFocusScroll = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement) || !target.matches('input, textarea, select')) return;
+      if (focusScrollTimer) clearTimeout(focusScrollTimer);
+      focusScrollTimer = setTimeout(() => {
+        const bounds = target.getBoundingClientRect();
+        const visibleBottom = (visualViewport?.offsetTop ?? 0) + (visualViewport?.height ?? window.innerHeight);
+        if (bounds.bottom > visibleBottom - 16) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 250);
+    };
     const updateStickyProgress = () => {
       const progressBounds = progressCard.getBoundingClientRect();
       const isVisible = stickyProgressVisible();
@@ -81,12 +108,22 @@ export default function App(props: AppProps) {
     };
     window.addEventListener('scroll', updateStickyProgress, { passive: true });
     window.addEventListener('resize', updateStickyProgress);
+    window.addEventListener('resize', syncKeyboardViewport);
+    document.addEventListener('focusin', scheduleFocusScroll);
+    visualViewport?.addEventListener('resize', syncKeyboardViewport);
+    visualViewport?.addEventListener('scroll', syncKeyboardViewport);
+    syncKeyboardViewport();
     updateStickyProgress();
     window.addEventListener('pointerdown', handlePointer);
     window.addEventListener('keydown', handleKey);
     onCleanup(() => {
       window.removeEventListener('scroll', updateStickyProgress);
       window.removeEventListener('resize', updateStickyProgress);
+      window.removeEventListener('resize', syncKeyboardViewport);
+      document.removeEventListener('focusin', scheduleFocusScroll);
+      visualViewport?.removeEventListener('resize', syncKeyboardViewport);
+      visualViewport?.removeEventListener('scroll', syncKeyboardViewport);
+      if (focusScrollTimer) clearTimeout(focusScrollTimer);
       window.removeEventListener('pointerdown', handlePointer);
       window.removeEventListener('keydown', handleKey);
       if (toastTimer) clearTimeout(toastTimer);
@@ -249,8 +286,8 @@ export default function App(props: AppProps) {
   }
 
   function focusAdd() {
+    itemInput.focus();
     itemInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    itemInput.focus({ preventScroll: true });
   }
 
   const ListTile = (props: { list: ShoppingList; mobile?: boolean }) => (
@@ -308,7 +345,7 @@ export default function App(props: AppProps) {
       <button type="button" onClick={props.onReset}>{t('resetData')}</button>
       <LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/>
     </main>
-  }><div class="min-h-dvh bg-[#f8faf7] text-[#243a2e]">
+  }><div class="min-h-[var(--app-viewport-height,100dvh)] bg-[#f8faf7] text-[#243a2e]">
     <div aria-hidden={!stickyProgressVisible()} class={`fixed inset-x-0 top-0 z-50 transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none lg:left-[17.125rem] xl:left-[18.75rem] ${stickyProgressVisible() ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
         <div class="mx-auto w-full max-w-260 px-5 sm:px-9 lg:px-11 xl:px-16">
           <div class="rounded-b-[18px] bg-[#205845] px-4 pb-3.5 pt-3 shadow-[0_8px_22px_rgba(32,88,69,.1)] sm:px-5 sm:pb-4">
@@ -318,7 +355,7 @@ export default function App(props: AppProps) {
           </div>
         </div>
     </div>
-    <div class="mx-auto flex min-h-dvh max-w-384">
+    <div class="mx-auto flex min-h-[var(--app-viewport-height,100dvh)] max-w-384">
       {/* Desktop navigation */}
       <aside class="hidden w-68.5 shrink-0 flex-col border-r border-[#e8eee7] bg-[#fcfdfa] px-5 pb-7 pt-8 lg:flex xl:w-75 xl:px-6">
         <div class="flex items-center gap-3 px-2">
@@ -536,11 +573,11 @@ export default function App(props: AppProps) {
       </div>
     </div>
 
-    <button type="button" onClick={focusAdd} aria-label={t('jumpToAdd')} class="fixed bottom-5 right-5 z-10 grid h-13.5 w-13.5 place-items-center rounded-[17px] bg-[#205845] text-white shadow-[0_8px_30px_rgba(23,71,47,.3)] transition-transform hover:scale-105 lg:hidden"><Plus size={25}/></button>
+    <button type="button" onClick={focusAdd} aria-label={t('jumpToAdd')} class="fixed bottom-[calc(1.25rem+var(--keyboard-inset,0px))] right-5 z-10 grid h-13.5 w-13.5 place-items-center rounded-[17px] bg-[#205845] text-white shadow-[0_8px_30px_rgba(23,71,47,.3)] transition-transform hover:scale-105 lg:hidden"><Plus size={25}/></button>
 
-    <Show when={toast()}><div role="status" aria-live="polite" class="pointer-events-none fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[#1f4c38] px-4 py-2.5 text-[12px] font-semibold text-white shadow-2xl lg:bottom-8"><span class="flex items-center gap-2 whitespace-nowrap"><CheckCircle2 size={16}/>{toast()}</span><Show when={toastAction()}>{action => <button type="button" class="pointer-events-auto min-h-11 min-w-11 rounded-full px-2 py-1 font-extrabold text-[#d6eea7] underline underline-offset-2 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={action().onClick}>{action().label}</button>}</Show></div></Show>
+    <Show when={toast()}><div role="status" aria-live="polite" class="pointer-events-none fixed bottom-[calc(5rem+var(--keyboard-inset,0px))] left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[#1f4c38] px-4 py-2.5 text-[12px] font-semibold text-white shadow-2xl lg:bottom-8"><span class="flex items-center gap-2 whitespace-nowrap"><CheckCircle2 size={16}/>{toast()}</span><Show when={toastAction()}>{action => <button type="button" class="pointer-events-auto min-h-11 min-w-11 rounded-full px-2 py-1 font-extrabold text-[#d6eea7] underline underline-offset-2 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={action().onClick}>{action().label}</button>}</Show></div></Show>
 
-    <Show when={storageWarning()}><div role="status" class="fixed bottom-3 left-3 right-3 z-40 mx-auto max-w-xl rounded-xl border border-[#f1d9a8] bg-[#fff9e9] px-4 py-3 text-sm text-[#775f2c] shadow-lg"><strong class="block">{t('storageIssueTitle')}</strong><span>{t('storageIssueBody')}</span></div></Show>
+    <Show when={storageWarning()}><div role="status" class="fixed bottom-[calc(.75rem+var(--keyboard-inset,0px))] left-3 right-3 z-40 mx-auto max-w-xl rounded-xl border border-[#f1d9a8] bg-[#fff9e9] px-4 py-3 text-sm text-[#775f2c] shadow-lg"><strong class="block">{t('storageIssueTitle')}</strong><span>{t('storageIssueBody')}</span></div></Show>
 
     <Modal open={dialogMode() !== null} onClose={() => setDialogMode(null)}
       title={dialogMode() === 'new-list' ? t('createListTitle') : dialogMode() === 'rename-list' ? t('editListTitle') : t('deleteListTitle')}
