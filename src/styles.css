@@ -14,10 +14,11 @@ button:focus-visible, input:focus-visible { outline-offset: 2px; }
 .section-eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .15em; color: #91a594; }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
-.icon-button { display: grid; height: 34px; width: 34px; place-items: center; border-radius: 9px; color: #83998a; }
+.icon-button { display: grid; height: 44px; width: 44px; place-items: center; border-radius: 11px; color: #718879; }
 .icon-button:hover { background: #f0f5ef; }
-.row-action { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; color: #9bac9f; }
+.row-action { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 11px; color: #718879; }
 .row-action:hover { background: #eff5ee; color: #356d4f; }
+.row-action:focus-visible { outline: 2px solid #2b7055; outline-offset: 2px; }
 .menu-item { display: flex; width: 100%; align-items: center; gap: 10px; padding: 11px 12px; text-align: left; font-size: 12px; font-weight: 700; border-radius: 9px; }
 .menu-item:hover:not(:disabled) { background: #f2f6f0; }
 .modal-panel::backdrop { backdrop-filter: blur(3px); }

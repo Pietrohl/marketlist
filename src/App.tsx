@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount }
 import {
   ArrowRight, Check, CheckCheck, CheckCircle2, ChevronDown,
   CircleHelp, CloudOff, Ellipsis, Leaf, ListChecks,
-  Pencil, Plus, Search, ShoppingBag, ShoppingBasket, Sparkles, Trash2, X,
+  Pencil, Plus, Search, ShoppingBasket, Sparkles, Trash2, X,
 } from 'lucide-solid';
 import Modal from './components/Modal';
 import { ListIcon } from './components/ListIcon';
@@ -38,7 +38,9 @@ export default function App(props: AppProps) {
   const [draftListIcon, setDraftListIcon] = createSignal('🛒');
   const [dialogError, setDialogError] = createSignal('');
   const [toast, setToast] = createSignal('');
+  const [toastAction, setToastAction] = createSignal<{ label: string; onClick: () => void } | null>(null);
   const [inputFocused, setInputFocused] = createSignal(false);
+  const [showAllIcons, setShowAllIcons] = createSignal(false);
   let itemInput!: HTMLInputElement;
   let menuElement!: HTMLDivElement;
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -77,10 +79,14 @@ export default function App(props: AppProps) {
     });
   });
 
-  const notify = (message: string) => {
+  const notify = (message: string, action: { label: string; onClick: () => void } | null = null) => {
     setToast(message);
+    setToastAction(action);
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => setToast(''), 2800);
+    toastTimer = setTimeout(() => {
+      setToast('');
+      setToastAction(null);
+    }, 10000);
   };
 
   function selectList(id: string) {
@@ -95,6 +101,12 @@ export default function App(props: AppProps) {
     const name = newItemName().trim().replace(/\s+/g, ' ');
     const targetId = activeList()?.id;
     if (!name || !targetId) return;
+    addItemToList(targetId, name);
+  }
+
+  function addItemToList(targetId: string, rawName: string) {
+    const name = rawName.trim().replace(/\s+/g, ' ');
+    if (!name) return;
     const item: ShoppingItem = { id: newId(), name, checked: false, addedAt: new Date().toISOString() };
     setState(previous => ({
       ...previous,
@@ -102,7 +114,7 @@ export default function App(props: AppProps) {
     }));
     setNewItemName('');
     notify(t('itemAdded', { name }));
-    itemInput.focus();
+    itemInput?.focus();
   }
 
   function toggleItem(itemId: string) {
@@ -121,14 +133,30 @@ export default function App(props: AppProps) {
   }
 
   function deleteItem(itemId: string) {
-    const targetId = activeList()?.id;
+    const target = activeList();
+    const targetId = target?.id;
+    const removedItem = target?.items.find(item => item.id === itemId);
+    if (!targetId || !removedItem) return;
     setState(previous => ({
       ...previous,
       lists: previous.lists.map(list => list.id === targetId ? {
         ...list, items: list.items.filter(item => item.id !== itemId),
       } : list),
     }));
-    notify(t('itemRemoved'));
+    notify(t('itemRemoved'), {
+      label: t('undo'),
+      onClick: () => {
+        setState(previous => ({
+          ...previous,
+          lists: previous.lists.map(list => list.id === targetId && !list.items.some(item => item.id === removedItem.id)
+            ? { ...list, items: [...list.items, removedItem] }
+            : list),
+        }));
+        setToast('');
+        setToastAction(null);
+        if (toastTimer) clearTimeout(toastTimer);
+      },
+    });
   }
 
   function saveItemEdit(itemId: string) {
@@ -150,6 +178,7 @@ export default function App(props: AppProps) {
     setDialogMode(mode);
     setDraftListName(mode === 'rename-list' ? activeList()?.name ?? '' : '');
     setDraftListIcon(mode === 'rename-list' ? activeList()?.icon ?? '🛒' : '🛒');
+    setShowAllIcons(false);
   }
 
   function submitList(event: SubmitEvent) {
@@ -211,11 +240,11 @@ export default function App(props: AppProps) {
   );
 
   const ItemRow = (props: { item: ShoppingItem }) => (
-    <li class="group/item flex min-h-17.25 items-center gap-3.5 rounded-[15px] border border-[#e9eee8] bg-white px-4 py-3 shadow-[0_2px_12px_rgba(31,55,42,.025)] transition-all hover:border-[#ccdcd0] hover:shadow-sm sm:px-5">
+      <li class="group/item flex min-h-17.25 items-center gap-2 rounded-[15px] border border-[#e9eee8] bg-white px-3 py-3 shadow-[0_2px_12px_rgba(31,55,42,.025)] transition-all hover:border-[#ccdcd0] hover:shadow-sm sm:gap-3.5 sm:px-5">
       <button type="button" aria-label={props.item.checked ? t('markNeeded', { name: props.item.name }) : t('markPurchased', { name: props.item.name })}
         aria-pressed={props.item.checked}
         onClick={() => toggleItem(props.item.id)}
-        class="grid h-10 w-10 -ml-1.5 shrink-0 place-items-center rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]">
+        class="grid h-11 w-11 -ml-1.5 shrink-0 place-items-center rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]">
         <span class={`grid h-6.5 w-6.5 place-items-center rounded-lg border-2 transition-all ${props.item.checked ? 'border-[#2d7957] bg-[#2d7957] text-white' : 'border-[#b6c7bb] bg-white group-hover/item:border-[#7aa184]'}`}>
           <Show when={props.item.checked}><Check size={16} strokeWidth={3}/></Show>
         </span>
@@ -233,7 +262,7 @@ export default function App(props: AppProps) {
         </form>
       </Show>
       <Show when={editingItemId() !== props.item.id}>
-        <div class="flex shrink-0 items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover/item:opacity-100 sm:group-focus-within/item:opacity-100">
+        <div class="flex shrink-0 items-center gap-0.5">
           <button type="button" class="row-action" aria-label={t('renameItem', { name: props.item.name })} onClick={() => { setEditingItemId(props.item.id); setEditingItemName(props.item.name); }}><Pencil size={15}/></button>
           <button type="button" class="row-action hover:bg-[#fff0ee]! hover:text-[#be5d4e]!" aria-label={t('removeItem', { name: props.item.name })} onClick={() => deleteItem(props.item.id)}><Trash2 size={16}/></button>
         </div>
@@ -285,7 +314,7 @@ export default function App(props: AppProps) {
               <div class="grid h-9 w-9 place-items-center rounded-xl bg-[#205845] text-[#e0ecb6]"><ShoppingBasket size={20}/></div>
               <span class="text-[23px] font-extrabold tracking-[-1.4px]">gather<span class="text-[#8bb491]">.</span></span>
             </div>
-            <div class="flex items-center gap-2"><LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/><span class="flex items-center gap-1.5 rounded-full bg-[#f0f5ee] px-3 py-1.5 text-[11px] font-semibold text-[#61836b]"><span class="h-1.5 w-1.5 rounded-full bg-[#69a47a]"/> {t('onlineStatus')}</span></div>
+            <div class="flex items-center gap-2"><LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/><span class="flex items-center gap-1.5 rounded-full bg-[#f0f5ee] px-3 py-1.5 text-[11px] font-semibold text-[#61836b]"><CloudOff size={13}/> {t('offlineCapability')}</span></div>
           </div>
           <div class="px-5 pb-4 sm:px-8">
             <div class="mb-2.5 flex items-center justify-between">
@@ -295,6 +324,9 @@ export default function App(props: AppProps) {
             <nav aria-label={t('shoppingLists')} class="no-scrollbar -mr-5 flex gap-2.5 overflow-x-auto pb-1 pr-5 sm:-mr-8 sm:pr-8">
               <For each={state().lists}>{list => <ListTile list={list} mobile />}</For>
             </nav>
+            <Show when={state().lists.length > 2}>
+              <p class="mt-1.5 text-right text-[10px] font-medium text-[#87988b]">{t('swipeLists')}</p>
+            </Show>
           </div>
         </header>
 
@@ -315,7 +347,7 @@ export default function App(props: AppProps) {
             </div>
             <Show when={activeList()}>
               <div class="relative mt-1 shrink-0" ref={menuElement}>
-                <button type="button" aria-label={t('listOptions')} aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => setMenuOpen(open => !open)} class="grid h-10 w-10 place-items-center rounded-xl border border-[#e2e9e0] bg-white text-[#6c806f] shadow-sm transition-colors hover:bg-[#eef5eb]"><Ellipsis size={23}/></button>
+                <button type="button" aria-label={t('listOptions')} aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => setMenuOpen(open => !open)} class="grid h-11 w-11 place-items-center rounded-xl border border-[#e2e9e0] bg-white text-[#6c806f] shadow-sm transition-colors hover:bg-[#eef5eb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Ellipsis size={23}/></button>
                 <Show when={menuOpen()}>
                   <div role="menu" class="absolute right-0 top-12 z-20 w-47.5 rounded-[14px] border border-[#e5ece4] bg-white p-1.5 shadow-[0_14px_50px_rgba(28,53,39,.14)]">
                     <button type="button" role="menuitem" class="menu-item" onClick={() => openDialog('rename-list')}><Pencil size={16}/> {t('editList')}</button>
@@ -327,22 +359,19 @@ export default function App(props: AppProps) {
           </div>
 
           {/* Progress card */}
-          <section class="relative mb-7 overflow-hidden rounded-[23px] bg-[#205845] p-5 text-white shadow-[0_8px_22px_rgba(32,88,69,.1)] sm:mb-8 sm:p-7" aria-label={t('progress')}>
-            <div class="pointer-events-none absolute -right-8 -top-16 h-44 w-44 rounded-full border-28 border-white/6.5 sm:right-6"/>
-            <div class="pointer-events-none absolute -bottom-28 right-2 h-48 w-48 rounded-full border-32 border-[#c8e8a0]/11"/>
-            <div class="relative flex items-start justify-between gap-3">
+          <section class="relative mb-5 overflow-hidden rounded-[18px] bg-[#205845] px-4 py-3.5 text-white shadow-[0_5px_16px_rgba(32,88,69,.1)] sm:mb-6 sm:px-5 sm:py-4" aria-label={t('progress')}>
+            <div class="relative flex items-center justify-between gap-4">
               <div>
-                <p class="text-[11px] font-semibold tracking-[.08em] text-[#bfdbbc]">{t('shoppingProgress')}</p>
-                <h2 class="mt-3 text-[25px] font-bold tracking-[-.6px] sm:text-[29px]">
-                  <Show when={activeList()?.items.length} fallback={t('freshStart')}><span>{pendingItems().length}</span> <span class="text-[#b7d6b6]">{t('itemsLeft')}</span></Show>
+                <p class="text-[10px] font-bold tracking-[.06em] text-[#bfdbbc]">{t('shoppingProgress')}</p>
+                <h2 class="mt-1 text-[18px] font-bold tracking-[-.3px] sm:text-[20px]">
+                  <Show when={activeList()?.items.length} fallback={t('freshStart')}><span>{pendingItems().length}</span> <span class="text-[#b7d6b6]">{t(pendingItems().length === 1 ? 'itemLeft' : 'itemsLeft')}</span></Show>
                 </h2>
-                <p class="mt-1.5 text-[12px] text-[#c2ddca]">{activeList()?.items.length ? (completePercent() === 100 ? t('allDone') : t('checkedProgress', { done: completedItems().length, total: activeList()?.items.length ?? 0 })) : activeList() ? t('addFirstPrompt') : t('noListsBody')}</p>
+                <p class="mt-0.5 text-[11px] text-[#c2ddca]">{activeList()?.items.length ? (completePercent() === 100 ? t('allDone') : t('checkedProgress', { done: completedItems().length, total: activeList()?.items.length ?? 0 })) : activeList() ? t('addFirstPrompt') : t('noListsBody')}</p>
               </div>
-              <div class="grid h-13.25 w-13.25 shrink-0 place-items-center rounded-[15px] bg-white/11 text-[#d3f09c] sm:h-15 sm:w-15"><ShoppingBag size={27} strokeWidth={1.7}/></div>
+              <span class="shrink-0 text-[17px] font-extrabold tabular-nums text-[#e4f7c9]">{completePercent()}%</span>
             </div>
-            <div class="relative mt-6 flex items-center gap-3">
-              <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-white/17"><div class="h-full rounded-full bg-[#cce69b] transition-[width] duration-300" style={{ width: `${completePercent()}%` }}/></div>
-              <span class="w-10 text-right text-[12px] font-bold text-[#e4f7c9]">{completePercent()}%</span>
+            <div class="relative mt-3 h-2 overflow-hidden rounded-full bg-white/17" role="progressbar" aria-label={t('progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={completePercent()}>
+              <div class="h-full rounded-full bg-[#cce69b] transition-[width] duration-300" style={{ width: `${completePercent()}%` }}/>
             </div>
           </section>
 
@@ -361,7 +390,7 @@ export default function App(props: AppProps) {
                     placeholder={t('itemPlaceholder')} aria-label={t('newItem')} aria-controls="similar-items" aria-autocomplete="list"
                     value={newItemName()} onInput={event => setNewItemName(event.currentTarget.value)} onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)}
                     class="h-11 w-full min-w-0 bg-transparent text-[13px] font-medium text-[#2a4332] outline-none placeholder:text-[#a4b0a7] sm:h-12 sm:text-[14px]"/>
-                  <Show when={newItemName().length > 0}><button type="button" class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[#a7b1a8] hover:bg-[#f1f5f0]" aria-label={t('clearInput')} onClick={() => { setNewItemName(''); itemInput.focus(); }}><X size={16}/></button></Show>
+                  <Show when={newItemName().length > 0}><button type="button" class="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-[#718879] hover:bg-[#f1f5f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]" aria-label={t('clearInput')} onClick={() => { setNewItemName(''); itemInput.focus(); }}><X size={16}/></button></Show>
                 </div>
                 <button type="submit" disabled={!newItemName().trim()} class="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#235d46] px-4 text-[12px] font-bold text-white transition-all hover:bg-[#174632] disabled:cursor-not-allowed disabled:opacity-45 sm:h-12 sm:px-5 sm:text-[13px]"><Plus size={18} strokeWidth={2.5}/><span>{t('addItem')}</span></button>
               </form>
@@ -387,7 +416,12 @@ export default function App(props: AppProps) {
                               <time dateTime={match.item.addedAt} title={new Date(match.item.addedAt).toLocaleString(props.locale())}>{t('added', { date: formatAddedAt(match.item.addedAt, props.locale()) })}</time>
                             </div>
                           </div>
-                          <span class={`mt-1 h-fit shrink-0 rounded-full px-2 py-1 text-[10px] font-bold sm:mt-0 ${match.item.checked ? 'bg-[#e5f2e7] text-[#367854]' : 'bg-[#fff1de] text-[#a07538]'}`}>{match.item.checked ? t('checked') : t('unchecked')}</span>
+                          <div class="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
+                            <span class={`h-fit rounded-full px-2 py-1 text-[10px] font-bold ${match.item.checked ? 'bg-[#e5f2e7] text-[#367854]' : 'bg-[#fff1de] text-[#a07538]'}`}>{match.item.checked ? t('checked') : t('unchecked')}</span>
+                            <Show when={!activeList()?.items.some(item => fold(item.name) === fold(match.item.name))} fallback={<span class="px-1 text-[10px] font-semibold text-[#7f9282]">{t('alreadyOnList')}</span>}>
+                              <button type="button" class="min-h-11 rounded-lg bg-[#205845] px-3 text-[11px] font-bold text-white transition-colors hover:bg-[#174633] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]" aria-label={t('addSuggestedItem', { name: match.item.name })} onClick={() => { const targetId = activeList()?.id; if (targetId) addItemToList(targetId, match.item.name); }}>{t('addSuggestion')}</button>
+                            </Show>
+                          </div>
                         </li>
                       }</For>
                     </ul>
@@ -436,7 +470,7 @@ export default function App(props: AppProps) {
           </section>
           </Show>
 
-          <footer class="mt-12 flex flex-col items-center gap-2 border-t border-[#e8eee7] pt-6 text-center text-[11px] text-[#a4b1a5] sm:flex-row sm:justify-between sm:text-left">
+          <footer class="mt-8 flex flex-col items-center gap-2 border-t border-[#e8eee7] pt-6 text-center text-[11px] text-[#a4b1a5] sm:flex-row sm:justify-between sm:text-left">
             <span>{t('madeFor')}</span>
             <span class="flex items-center gap-1.5"><CloudOff size={13}/> {t('privateLocal')}</span>
           </footer>
@@ -446,7 +480,7 @@ export default function App(props: AppProps) {
 
     <button type="button" onClick={focusAdd} aria-label={t('jumpToAdd')} class="fixed bottom-5 right-5 z-10 grid h-13.5 w-13.5 place-items-center rounded-[17px] bg-[#205845] text-white shadow-[0_8px_30px_rgba(23,71,47,.3)] transition-transform hover:scale-105 lg:hidden"><Plus size={25}/></button>
 
-    <Show when={toast()}><div role="status" aria-live="polite" class="pointer-events-none fixed bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-full bg-[#1f4c38] px-4 py-3 text-[12px] font-semibold text-white shadow-2xl lg:bottom-8"><span class="flex items-center gap-2 whitespace-nowrap"><CheckCircle2 size={16}/>{toast()}</span></div></Show>
+    <Show when={toast()}><div role="status" aria-live="polite" class="pointer-events-none fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[#1f4c38] px-4 py-2.5 text-[12px] font-semibold text-white shadow-2xl lg:bottom-8"><span class="flex items-center gap-2 whitespace-nowrap"><CheckCircle2 size={16}/>{toast()}</span><Show when={toastAction()}>{action => <button type="button" class="pointer-events-auto min-h-11 min-w-11 rounded-full px-2 py-1 font-extrabold text-[#d6eea7] underline underline-offset-2 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={action().onClick}>{action().label}</button>}</Show></div></Show>
 
     <Show when={storageWarning()}><div role="status" class="fixed bottom-3 left-3 right-3 z-40 mx-auto max-w-xl rounded-xl border border-[#f1d9a8] bg-[#fff9e9] px-4 py-3 text-sm text-[#775f2c] shadow-lg"><strong class="block">{t('storageIssueTitle')}</strong><span>{t('storageIssueBody')}</span></div></Show>
 
@@ -466,10 +500,11 @@ export default function App(props: AppProps) {
           <label for="list-name" class="mb-2 block text-[12px] font-bold text-[#465c4c]">{t('listName')}</label>
           <input id="list-name" class="w-full rounded-xl border border-[#d8e2d8] px-4 py-3 text-sm outline-none focus:border-[#6b9e78] focus:ring-2 focus:ring-[#d8ecdb]" maxlength={42} placeholder={t('listNamePlaceholder')} value={draftListName()} onInput={event => { setDraftListName(event.currentTarget.value); setDialogError(''); }} />
           <p class="mb-3 mt-5 text-[12px] font-bold text-[#465c4c]">{t('chooseIcon')}</p>
-          <div class="grid grid-cols-8 gap-1.5">
-            <For each={LIST_ICONS}>{icon => <button type="button" aria-label={t('useIcon', { icon })} aria-pressed={draftListIcon() === icon}
-              class={`grid h-9 w-full place-items-center rounded-lg border text-[19px] transition-colors ${draftListIcon() === icon ? 'border-[#558b64] bg-[#ebf5e9]' : 'border-[#e6ebe4] bg-white hover:bg-[#f4f8f1]'}`} onClick={() => setDraftListIcon(icon)}>{icon}</button>}</For>
+          <div id="list-icons" class="grid grid-cols-4 gap-2">
+            <For each={showAllIcons() ? LIST_ICONS : LIST_ICONS.slice(0, 4)}>{icon => <button type="button" aria-label={t('useIcon', { icon })} aria-pressed={draftListIcon() === icon}
+              class={`grid h-11 w-full place-items-center rounded-lg border text-[19px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055] ${draftListIcon() === icon ? 'border-[#558b64] bg-[#ebf5e9]' : 'border-[#e6ebe4] bg-white hover:bg-[#f4f8f1]'}`} onClick={() => setDraftListIcon(icon)}>{icon}</button>}</For>
           </div>
+          <button type="button" class="mt-2 min-h-11 text-[12px] font-bold text-[#337654] underline underline-offset-2" aria-expanded={showAllIcons()} aria-controls="list-icons" onClick={() => setShowAllIcons(open => !open)}>{showAllIcons() ? t('fewerIcons') : t('moreIcons')}</button>
           <Show when={dialogError()}><p role="alert" class="mt-3 text-[12px] font-semibold text-[#b94e45]">{dialogError()}</p></Show>
           <div class="mt-7 flex gap-3">
             <button type="button" class="modal-secondary flex-1" onClick={() => setDialogMode(null)}>{t('cancel')}</button>
@@ -482,5 +517,5 @@ export default function App(props: AppProps) {
 }
 
 function LanguageButton(props: { locale: Locale; t: AppProps['t']; onToggle: () => void }) {
-  return <button type="button" onClick={props.onToggle} aria-label={props.t('switchLanguage')} class="rounded-lg border border-[#e2e9e0] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#55715c] hover:bg-[#f2f7f0]">{props.locale === 'en' ? 'PT' : 'EN'}</button>;
+  return <button type="button" onClick={props.onToggle} aria-label={props.t('switchLanguage')} class="min-h-11 min-w-11 rounded-lg border border-[#e2e9e0] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#55715c] hover:bg-[#f2f7f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]">{props.locale === 'en' ? 'PT' : 'EN'}</button>;
 }
