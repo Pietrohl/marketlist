@@ -8,6 +8,13 @@
   "display": "standalone",
   "background_color": "#f8faf7",
   "theme_color": "#f8faf7",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "./manifest.webmanifest",
+      "id": "https://pietrohl.github.io/"
+    }
+  ],
   "icons": [
     {
       "src": "./icon-192.png",

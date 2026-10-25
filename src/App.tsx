@@ -14,6 +14,10 @@ import { saveState } from './lib/storage';
 
 type DialogMode = 'new-list' | 'rename-list' | 'delete-list' | null;
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+type NavigatorWithInstalledApps = Navigator & {
+  getInstalledRelatedApps?: () => Promise<Array<{ platform: string }>>;
+  standalone?: boolean;
+};
 
 type AppProps = {
   initialState: AppState;
@@ -86,8 +90,12 @@ export default function App(props: AppProps) {
   });
 
   onMount(() => {
-    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const appNavigator = navigator as NavigatorWithInstalledApps;
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || appNavigator.standalone === true;
     if (isInstalled) installedApp();
+    else void appNavigator.getInstalledRelatedApps?.().then(apps => {
+      if (apps.some(app => app.platform === 'webapp')) installedApp();
+    }).catch(() => undefined);
     window.addEventListener('beforeinstallprompt', beforeInstallPrompt);
     window.addEventListener('appinstalled', installedApp);
     const visualViewport = window.visualViewport;
@@ -426,6 +434,7 @@ export default function App(props: AppProps) {
             <div class="mb-2.5 flex items-center justify-between">
               <span class="section-eyebrow">{t('yourLists', { count: state().lists.length })}</span>
               <div class="flex items-center gap-2">
+                <Show when={appInstalled()}><a href={import.meta.env.BASE_URL} class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#337654]"><ArrowRight size={14}/>{t('openApp')}</a></Show>
                 <Show when={!appInstalled() && installPrompt()}><button type="button" class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#337654]" onClick={() => void InstallApp()}><Download size={14}/>{t('installApp')}</button></Show>
                 <button type="button" class="inline-flex items-center gap-1 text-xs font-bold text-[#296d4d]" onClick={() => openDialog('new-list')}><Plus size={15}/> {t('new')}</button>
               </div>
@@ -442,7 +451,7 @@ export default function App(props: AppProps) {
         <main class="mx-auto w-full max-w-260 px-5 pb-24 pt-7 sm:px-9 sm:pt-10 lg:px-11 lg:pb-16 lg:pt-12 xl:px-16">
           <div class="mb-6 hidden items-center justify-between lg:flex">
             <div class="flex items-center gap-2 text-[12px] font-semibold text-[#9daaa0]"><LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/>{t('myListsCrumb')} <ArrowRight size={12}/><span class="text-[#4e735c]">{activeList()?.name}</span></div>
-            <div class="flex items-center gap-3 text-[12px] text-[#92a097]"><Show when={!appInstalled() && installPrompt()}><button type="button" onClick={() => void InstallApp()} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce8d9] bg-white px-3 font-semibold text-[#347454] hover:bg-[#f2f7f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Download size={16}/>{t('installApp')}</button></Show><span class="flex items-center gap-2"><CloudOff size={15}/> {t('savedLocally')}</span></div>
+            <div class="flex items-center gap-3 text-[12px] text-[#92a097]"><Show when={appInstalled()}><a href={import.meta.env.BASE_URL} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce8d9] bg-white px-3 font-semibold text-[#347454] hover:bg-[#f2f7f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><ArrowRight size={16}/>{t('openApp')}</a></Show><Show when={!appInstalled() && installPrompt()}><button type="button" onClick={() => void InstallApp()} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce8d9] bg-white px-3 font-semibold text-[#347454] hover:bg-[#f2f7f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Download size={16}/>{t('installApp')}</button></Show><span class="flex items-center gap-2"><CloudOff size={15}/> {t('savedLocally')}</span></div>
           </div>
 
           <div class="mb-7 flex items-start justify-between gap-3 sm:mb-8">
