@@ -11,6 +11,12 @@
   "launch_handler": {
     "client_mode": "navigate-existing"
   },
+  "protocol_handlers": [
+    {
+      "protocol": "web+gather",
+      "url": "./?launch=%s"
+    }
+  ],
   "related_applications": [
     {
       "platform": "webapp",
