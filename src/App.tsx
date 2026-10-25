@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
 import {
   ArrowRight, Check, CheckCheck, CheckCircle2, ChevronDown,
-  CircleHelp, CloudOff, Ellipsis, Leaf, ListChecks,
+  CircleHelp, CloudOff, Download, Ellipsis, Leaf, ListChecks,
   Pencil, Plus, RotateCcw, Search, ShoppingBasket, Sparkles, Trash2, X,
 } from 'lucide-solid';
 import Modal from './components/Modal';
@@ -13,6 +13,7 @@ import type { Locale } from './lib/i18n';
 import { saveState } from './lib/storage';
 
 type DialogMode = 'new-list' | 'rename-list' | 'delete-list' | null;
+type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 
 type AppProps = {
   initialState: AppState;
@@ -42,6 +43,8 @@ export default function App(props: AppProps) {
   const [inputFocused, setInputFocused] = createSignal(false);
   const [showAllIcons, setShowAllIcons] = createSignal(false);
   const [stickyProgressVisible, setStickyProgressVisible] = createSignal(false);
+  const [installPrompt, setInstallPrompt] = createSignal<InstallPromptEvent | null>(null);
+  const [appInstalled, setAppInstalled] = createSignal(false);
   let itemInput!: HTMLInputElement;
   let menuElement!: HTMLDivElement;
   let progressBar!: HTMLDivElement;
@@ -58,11 +61,35 @@ export default function App(props: AppProps) {
   const similarItems = createMemo(() => findSimilarItems(newItemName(), state().lists));
   const exactOnCurrentList = createMemo(() => activeList()?.items.some(item => fold(item.name) === fold(newItemName())) ?? false);
 
+  function beforeInstallPrompt(event: Event) {
+    event.preventDefault();
+    setInstallPrompt(event as InstallPromptEvent);
+  }
+
+  function installedApp() {
+    setAppInstalled(true);
+    setInstallPrompt(null);
+  }
+
+  async function InstallApp() {
+    const prompt = installPrompt();
+    if (!prompt) return;
+    try {
+      await prompt.prompt();
+      await prompt.userChoice;
+    } catch { /* The browser may reject a prompt that is no longer available. */ }
+    setInstallPrompt(null);
+  }
+
   createEffect(() => {
     if (!props.storageCorrupt && !saveState(state())) setStorageWarning(true);
   });
 
   onMount(() => {
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (isInstalled) installedApp();
+    window.addEventListener('beforeinstallprompt', beforeInstallPrompt);
+    window.addEventListener('appinstalled', installedApp);
     const visualViewport = window.visualViewport;
     let focusScrollTimer: ReturnType<typeof setTimeout> | undefined;
     const syncKeyboardViewport = () => {
@@ -126,6 +153,8 @@ export default function App(props: AppProps) {
       if (focusScrollTimer) clearTimeout(focusScrollTimer);
       window.removeEventListener('pointerdown', handlePointer);
       window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('beforeinstallprompt', beforeInstallPrompt);
+      window.removeEventListener('appinstalled', installedApp);
       if (toastTimer) clearTimeout(toastTimer);
     });
   });
@@ -396,7 +425,10 @@ export default function App(props: AppProps) {
           <div class="px-5 pb-4 sm:px-8">
             <div class="mb-2.5 flex items-center justify-between">
               <span class="section-eyebrow">{t('yourLists', { count: state().lists.length })}</span>
-              <button type="button" class="inline-flex items-center gap-1 text-xs font-bold text-[#296d4d]" onClick={() => openDialog('new-list')}><Plus size={15}/> {t('new')}</button>
+              <div class="flex items-center gap-2">
+                <Show when={!appInstalled() && installPrompt()}><button type="button" class="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-[11px] font-bold text-[#337654]" onClick={() => void InstallApp()}><Download size={14}/>{t('installApp')}</button></Show>
+                <button type="button" class="inline-flex items-center gap-1 text-xs font-bold text-[#296d4d]" onClick={() => openDialog('new-list')}><Plus size={15}/> {t('new')}</button>
+              </div>
             </div>
             <nav aria-label={t('shoppingLists')} class="no-scrollbar -mr-5 flex gap-2.5 overflow-x-auto pb-1 pr-5 sm:-mr-8 sm:pr-8">
               <For each={state().lists}>{list => <ListTile list={list} mobile />}</For>
@@ -410,7 +442,7 @@ export default function App(props: AppProps) {
         <main class="mx-auto w-full max-w-260 px-5 pb-24 pt-7 sm:px-9 sm:pt-10 lg:px-11 lg:pb-16 lg:pt-12 xl:px-16">
           <div class="mb-6 hidden items-center justify-between lg:flex">
             <div class="flex items-center gap-2 text-[12px] font-semibold text-[#9daaa0]"><LanguageButton locale={props.locale()} t={t} onToggle={props.onToggleLocale}/>{t('myListsCrumb')} <ArrowRight size={12}/><span class="text-[#4e735c]">{activeList()?.name}</span></div>
-            <div class="flex items-center gap-2 text-[12px] text-[#92a097]"><CloudOff size={15}/> {t('savedLocally')}</div>
+            <div class="flex items-center gap-3 text-[12px] text-[#92a097]"><Show when={!appInstalled() && installPrompt()}><button type="button" onClick={() => void InstallApp()} class="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#dce8d9] bg-white px-3 font-semibold text-[#347454] hover:bg-[#f2f7f0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Download size={16}/>{t('installApp')}</button></Show><span class="flex items-center gap-2"><CloudOff size={15}/> {t('savedLocally')}</span></div>
           </div>
 
           <div class="mb-7 flex items-start justify-between gap-3 sm:mb-8">
@@ -608,6 +640,7 @@ export default function App(props: AppProps) {
         </form>
       </Show>
     </Modal>
+
   </div></Show>;
 }
 

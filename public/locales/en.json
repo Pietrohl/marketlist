@@ -11,6 +11,7 @@
   "onDevice": "Your lists stay right here, on this device.",
   "storedLocally": "Stored locally on this device",
   "offlineCapability": "Works offline",
+  "installApp": "Install app",
   "swipeLists": "Swipe to see all lists",
   "yourLists": "YOUR LISTS ({count})",
   "new": "New list",
