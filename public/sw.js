@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gather-shell-v5';
+const CACHE_NAME = 'gather-shell-v6';
 const APP_BASE = new URL(self.registration.scope);
 const APP_PATH = APP_BASE.pathname;
 const INDEX_URL = new URL('index.html', APP_BASE);
