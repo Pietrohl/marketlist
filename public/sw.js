@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gather-shell-v6';
+const CACHE_NAME = 'gather-shell-v7';
 const APP_BASE = new URL(self.registration.scope);
 const APP_PATH = APP_BASE.pathname;
 const INDEX_URL = new URL('index.html', APP_BASE);
@@ -9,6 +9,7 @@ const APP_SHELL = [
   'icon.svg',
   'icon-192.png',
   'icon-512.png',
+  'icon-maskable-512.png',
   'favicon.svg',
   'locales/en.json',
   'locales/pt-BR.json',
