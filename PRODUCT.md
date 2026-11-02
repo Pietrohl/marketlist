@@ -26,6 +26,7 @@ People create and switch between lists, add items, and mark items as purchased w
 
 - Create, rename, switch, and delete shopping lists; add, edit, check off, and remove items.
 - Sort checklist items by completion and name, and find similar items across saved lists while entering an item.
+- Use a basic offline calculator while shopping; the calculation survives closing the panel and resets when the page reloads.
 - Save list data and language preference in browser localStorage. Data is not sent to a server.
 - Support English and Brazilian Portuguese, choosing an initial language from browser preferences and allowing an in-app change.
 - Validate saved data on startup and preserve malformed data until the user chooses to reset it. If browser storage is unavailable or full, the app remains usable for the session and warns that changes may not persist.

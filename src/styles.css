@@ -24,6 +24,13 @@ button:focus-visible, input:focus-visible { outline-offset: 2px; }
 .modal-panel::backdrop { backdrop-filter: blur(3px); }
 .modal-secondary { border: 1px solid #dae4d9; border-radius: 12px; padding: 12px 16px; color: #526b59; font-size: 14px; font-weight: 700; }
 .modal-secondary:hover { background: #f4f8f3; }
+.calculator-key { display: grid; min-height: 48px; place-items: center; border: 1px solid #dae4d9; border-radius: 12px; background: white; color: #243a2e; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; touch-action: manipulation; }
+.calculator-key:hover { background: #f4f8f3; }
+.calculator-key:active { background: #e1eddd; }
+.calculator-key:focus-visible { outline: 2px solid #2b7055; }
+.calculator-operation { background: #edf5e9; color: #305f42; }
+.calculator-equals { border-color: #205845; background: #205845; color: white; }
+.calculator-equals:hover, .calculator-equals:active { background: #174633; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
 .startup-state { display: grid; min-height: 100dvh; place-content: center; gap: 12px; padding: 24px; color: #243a2e; font-family: ui-sans-serif, system-ui, sans-serif; text-align: center; }
 .startup-state h1 { margin: 0; font-size: 1.4rem; font-weight: 800; }

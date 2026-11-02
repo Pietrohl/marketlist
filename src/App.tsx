@@ -1,10 +1,11 @@
 import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
 import {
-  ArrowRight, Check, CheckCheck, CheckCircle2, ChevronDown,
+  ArrowRight, Calculator as CalculatorIcon, Check, CheckCheck, CheckCircle2, ChevronDown,
   CircleHelp, CloudOff, Download, Ellipsis, Leaf, ListChecks,
   Pencil, Plus, RotateCcw, Search, ShoppingBasket, Sparkles, Trash2, X,
 } from 'lucide-solid';
 import Modal from './components/Modal';
+import Calculator from './components/Calculator';
 import { ListIcon } from './components/ListIcon';
 import { dateAgo, fold, formatAddedAt, LIST_ICONS, newId, remainingCount, sortItems } from './lib/lists';
 import { findSimilarItems } from './lib/search';
@@ -39,6 +40,8 @@ export default function App(props: AppProps) {
   const [editingItemId, setEditingItemId] = createSignal<string | null>(null);
   const [editingItemName, setEditingItemName] = createSignal('');
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [calculatorOpen, setCalculatorOpen] = createSignal(false);
+  const [floatingCalculatorVisible, setFloatingCalculatorVisible] = createSignal(false);
   const [dialogMode, setDialogMode] = createSignal<DialogMode>(null);
   const [draftListName, setDraftListName] = createSignal('');
   const [draftListIcon, setDraftListIcon] = createSignal('🛒');
@@ -470,14 +473,23 @@ export default function App(props: AppProps) {
               </div>
             </div>
             <Show when={activeList()}>
-              <div class="relative mt-1 shrink-0" ref={menuElement}>
-                <button type="button" aria-label={t('listOptions')} aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => setMenuOpen(open => !open)} class="grid h-11 w-11 place-items-center rounded-xl border border-[#e2e9e0] bg-white text-[#6c806f] shadow-sm transition-colors hover:bg-[#eef5eb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Ellipsis size={23}/></button>
-                <Show when={menuOpen()}>
-                  <div role="menu" class="absolute right-0 top-12 z-20 w-47.5 rounded-[14px] border border-[#e5ece4] bg-white p-1.5 shadow-[0_14px_50px_rgba(28,53,39,.14)]">
-                    <button type="button" role="menuitem" class="menu-item" onClick={() => openDialog('rename-list')}><Pencil size={16}/> {t('editList')}</button>
-                    <button type="button" role="menuitem" disabled={state().lists.length <= 1} class="menu-item text-[#af5c52] disabled:cursor-not-allowed disabled:opacity-40" onClick={() => openDialog('delete-list')}><Trash2 size={16}/> {t('deleteList')}</button>
-                  </div>
-                </Show>
+              <div class="mt-1 flex shrink-0 gap-1.5 sm:gap-2">
+                <button ref={button => {
+                  const observer = new IntersectionObserver(([entry]) => {
+                    setFloatingCalculatorVisible(!entry.isIntersecting && entry.boundingClientRect.bottom <= 0);
+                  });
+                  observer.observe(button);
+                  onCleanup(() => observer.disconnect());
+                }} type="button" aria-label={t('calculator')} title={t('calculator')} aria-haspopup="dialog" onClick={() => { setMenuOpen(false); setCalculatorOpen(true); }} class="grid h-11 w-11 place-items-center rounded-xl border border-[#e2e9e0] bg-white text-[#52715b] shadow-sm transition-colors hover:bg-[#eef5eb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><CalculatorIcon size={20}/></button>
+                <div class="relative" ref={menuElement}>
+                  <button type="button" aria-label={t('listOptions')} aria-haspopup="menu" aria-expanded={menuOpen()} onClick={() => setMenuOpen(open => !open)} class="grid h-11 w-11 place-items-center rounded-xl border border-[#e2e9e0] bg-white text-[#6c806f] shadow-sm transition-colors hover:bg-[#eef5eb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><Ellipsis size={23}/></button>
+                  <Show when={menuOpen()}>
+                    <div role="menu" class="absolute right-0 top-12 z-20 w-47.5 rounded-[14px] border border-[#e5ece4] bg-white p-1.5 shadow-[0_14px_50px_rgba(28,53,39,.14)]">
+                      <button type="button" role="menuitem" class="menu-item" onClick={() => openDialog('rename-list')}><Pencil size={16}/> {t('editList')}</button>
+                      <button type="button" role="menuitem" disabled={state().lists.length <= 1} class="menu-item text-[#af5c52] disabled:cursor-not-allowed disabled:opacity-40" onClick={() => openDialog('delete-list')}><Trash2 size={16}/> {t('deleteList')}</button>
+                    </div>
+                  </Show>
+                </div>
               </div>
             </Show>
           </div>
@@ -620,11 +632,18 @@ export default function App(props: AppProps) {
       </div>
     </div>
 
-    <button type="button" onClick={focusAdd} aria-label={t('jumpToAdd')} class="fixed bottom-[calc(1.25rem+var(--keyboard-inset,0px))] right-5 z-10 grid h-13.5 w-13.5 place-items-center rounded-[17px] bg-[#205845] text-white shadow-[0_8px_30px_rgba(23,71,47,.3)] transition-transform hover:scale-105 lg:hidden"><Plus size={25}/></button>
+    <div class="fixed bottom-[calc(1.25rem+var(--keyboard-inset,0px))] right-5 z-10 flex flex-col gap-3 lg:hidden">
+      <Show when={activeList() && floatingCalculatorVisible()}>
+        <button type="button" aria-label={t('calculator')} title={t('calculator')} aria-haspopup="dialog" onClick={() => { setMenuOpen(false); setCalculatorOpen(true); }} class="grid h-13.5 w-13.5 place-items-center rounded-[17px] border border-[#e2e9e0] bg-white text-[#205845] shadow-[0_4px_16px_rgba(23,71,47,.15)] transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7055]"><CalculatorIcon size={23}/></button>
+      </Show>
+      <button type="button" onClick={focusAdd} aria-label={t('jumpToAdd')} class="grid h-13.5 w-13.5 place-items-center rounded-[17px] bg-[#205845] text-white shadow-[0_8px_30px_rgba(23,71,47,.3)] transition-transform hover:scale-105"><Plus size={25}/></button>
+    </div>
 
     <Show when={toast()}><div role="status" aria-live="polite" class="pointer-events-none fixed bottom-[calc(5rem+var(--keyboard-inset,0px))] left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-[#1f4c38] px-4 py-2.5 text-[12px] font-semibold text-white shadow-2xl lg:bottom-8"><span class="flex items-center gap-2 whitespace-nowrap"><CheckCircle2 size={16}/>{toast()}</span><Show when={toastAction()}>{action => <button type="button" class="pointer-events-auto min-h-11 min-w-11 rounded-full px-2 py-1 font-extrabold text-[#d6eea7] underline underline-offset-2 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" onClick={action().onClick}>{action().label}</button>}</Show></div></Show>
 
     <Show when={storageWarning()}><div role="status" class="fixed bottom-[calc(.75rem+var(--keyboard-inset,0px))] left-3 right-3 z-40 mx-auto max-w-xl rounded-xl border border-[#f1d9a8] bg-[#fff9e9] px-4 py-3 text-sm text-[#775f2c] shadow-lg"><strong class="block">{t('storageIssueTitle')}</strong><span>{t('storageIssueBody')}</span></div></Show>
+
+    <Calculator open={calculatorOpen()} onClose={() => setCalculatorOpen(false)} locale={props.locale()} t={t}/>
 
     <Modal open={dialogMode() !== null} onClose={() => setDialogMode(null)}
       title={dialogMode() === 'new-list' ? t('createListTitle') : dialogMode() === 'rename-list' ? t('editListTitle') : t('deleteListTitle')}
